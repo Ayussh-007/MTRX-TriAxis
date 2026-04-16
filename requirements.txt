@@ -1,0 +1,24 @@
+# ===== MTRX-TriAxis Dependencies =====
+
+# --- LLM & RAG ---
+langchain>=0.3.0
+langchain-ollama>=0.2.0
+langchain-community>=0.3.0
+langchain-core>=0.3.0
+
+# --- Vector Store ---
+faiss-cpu>=1.8.0
+
+# --- PDF Processing ---
+PyMuPDF>=1.24.0
+
+# --- Frontend ---
+streamlit>=1.39.0
+
+# --- Data & Utilities ---
+python-dotenv>=1.0.0
+requests>=2.31.0
+
+# --- Charts (for teacher dashboard) ---
+plotly>=5.22.0
+matplotlib>=3.8.0
