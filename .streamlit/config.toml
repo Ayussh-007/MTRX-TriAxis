@@ -1,10 +1,13 @@
 [theme]
-primaryColor = "#6C63FF"
-backgroundColor = "#0E1117"
-secondaryBackgroundColor = "#1A1D29"
-textColor = "#FAFAFA"
-font = "sans serif"
+primaryColor      = "#7C6FFF"
+backgroundColor   = "#0A0C14"
+secondaryBackgroundColor = "#12151F"
+textColor         = "#E8EAF0"
+font              = "sans serif"
 
 [server]
 headless = true
-port = 8501
+port     = 8501
+
+[runner]
+fastReruns = true

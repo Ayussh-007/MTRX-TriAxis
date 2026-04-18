@@ -9,15 +9,15 @@ from dotenv import load_dotenv
 
 from backend.student_model import list_students, get_student
 from backend.ai_agent import run_agent_pipeline
+from backend.ui_components import page_header, section_header
 
 load_dotenv()
 
-st.markdown("# 🤖 AI Agent — Multi-Step Reasoning")
-st.markdown(
-    "The AI Agent performs **sequential reasoning steps** to produce a comprehensive, "
-    "context-aware analysis for any student."
+page_header(
+    "🤖", "AI Agent — Multi-Step Reasoning",
+    "Sequential chain-of-thought reasoning for comprehensive, context-aware student analysis.",
+    accent="#F472B6",
 )
-st.markdown("---")
 
 # ----- Agent Architecture Diagram -----
 st.markdown(

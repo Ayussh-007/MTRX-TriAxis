@@ -33,11 +33,14 @@ with col_mgmt1:
     with st.form("add_student_form", clear_on_submit=True):
         new_name = st.text_input("Name", placeholder="e.g., Ayush Sharma")
         new_email = st.text_input("Email (optional)", placeholder="ayush@example.com")
+        new_login_id = st.text_input("Login ID", placeholder="e.g., STU001",
+                                     help="Unique ID for student self-service login.")
         submitted = st.form_submit_button("Add Student", type="primary")
 
         if submitted and new_name.strip():
             try:
-                sid = add_student(new_name.strip(), new_email.strip() or None)
+                sid = add_student(new_name.strip(), new_email.strip() or None,
+                                  new_login_id.strip() or None)
                 st.success(f"✅ Added {new_name} (ID: {sid})")
                 st.rerun()
             except Exception as e:

@@ -11,6 +11,7 @@ import pandas as pd
 import os
 from dotenv import load_dotenv
 
+from backend.ui_components import page_header, section_header
 from backend.teacher_insights import (
     get_class_performance,
     get_weak_topics_across_class,
@@ -26,12 +27,22 @@ from backend.teacher_feedback import (
 from backend.attendance_intelligence import get_frequently_absent_students
 from backend.class_weakness import get_top_weak_topics, generate_doubt_sheet
 from backend.weather_context import get_weather_summary, get_weather, is_bad_weather
+from backend.student_model import (
+    list_students, add_student, delete_student,
+    update_student_login_id, get_student,
+)
+from backend.content_sharing import (
+    create_share_link, get_all_share_links, assign_content_to_student,
+)
+from backend.calendar_planner import get_upcoming_holidays, is_holiday_today
 
 load_dotenv()
 
-st.markdown("# 👩‍🏫 Teacher Dashboard")
-st.markdown("Class analytics, feedback, insights, and AI-powered teaching suggestions.")
-st.markdown("---")
+page_header(
+    "👩‍🏫", "Teacher Dashboard",
+    "Class analytics, feedback, insights, and AI-powered teaching suggestions.",
+    accent="#FB923C",
+)
 
 # ----- Weather Context Bar (Feature 3) -----
 weather_city = os.getenv("WEATHER_CITY", "Mumbai")
@@ -365,3 +376,197 @@ if recent_fb:
 
     if "feedback_analysis" in st.session_state:
         st.markdown(st.session_state["feedback_analysis"])
+
+# =================================================================
+# STUDENT MANAGEMENT PANEL
+# =================================================================
+st.markdown("---")
+st.markdown("### 👥 Student Management")
+
+mgmt_col1, mgmt_col2 = st.columns([1, 2])
+
+with mgmt_col1:
+    st.markdown("#### ➕ Add Student")
+    with st.form("teacher_add_student_form", clear_on_submit=True):
+        new_name = st.text_input("Name", placeholder="e.g., Ayush Sharma")
+        new_email = st.text_input("Email (optional)", placeholder="ayush@example.com")
+        new_login_id = st.text_input(
+            "Login ID",
+            placeholder="e.g., STU001",
+            help="Unique ID for student login. Must be unique.",
+        )
+        add_submitted = st.form_submit_button("Add Student", type="primary")
+
+        if add_submitted and new_name.strip():
+            try:
+                sid = add_student(
+                    new_name.strip(),
+                    new_email.strip() or None,
+                    new_login_id.strip() or None,
+                )
+                st.success(f"✅ Added {new_name} (ID: {sid}, Login: {new_login_id or 'Not set'})")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error: {str(e)}")
+
+with mgmt_col2:
+    st.markdown("#### 📋 All Students")
+    all_students = list_students()
+
+    if all_students:
+        for s in all_students:
+            s_col1, s_col2, s_col3 = st.columns([3, 2, 1])
+
+            with s_col1:
+                login_badge = f"🔑 `{s.get('login_id', '')}`" if s.get('login_id') else "⚠️ No login ID"
+                st.markdown(f"**{s['name']}** (ID: {s['id']}) — {login_badge}")
+
+            with s_col2:
+                if not s.get('login_id'):
+                    new_lid = st.text_input(
+                        "Set Login ID",
+                        key=f"lid_{s['id']}",
+                        placeholder="STU001",
+                        label_visibility="collapsed",
+                    )
+                    if new_lid and st.button("Set", key=f"set_lid_{s['id']}"):
+                        try:
+                            update_student_login_id(s['id'], new_lid.strip())
+                            st.success(f"✅ Login ID set for {s['name']}")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error: {str(e)}")
+
+            with s_col3:
+                if st.button("🗑️", key=f"del_{s['id']}", help=f"Delete {s['name']}"):
+                    delete_student(s['id'])
+                    st.rerun()
+    else:
+        st.info("No students registered yet.")
+
+# =================================================================
+# CONTENT SHARING PANEL
+# =================================================================
+st.markdown("---")
+st.markdown("### 🔗 Content Sharing")
+
+share_col1, share_col2 = st.columns(2)
+
+with share_col1:
+    st.markdown("#### Generate Share Link")
+
+    share_type = st.selectbox(
+        "Content Type:",
+        options=["doubt_sheet", "learning_path"],
+        format_func=lambda x: x.replace("_", " ").title(),
+        key="share_type_select",
+    )
+
+    share_student = st.selectbox(
+        "Assign to (optional):",
+        options=["All Students"] + [f"{s['name']} (ID: {s['id']})" for s in all_students] if all_students else ["All Students"],
+        key="share_student_select",
+    )
+
+    share_text = st.text_area(
+        "Content to share:",
+        placeholder="Paste generated content here (doubt sheet, learning path, etc.)",
+        height=120,
+        key="share_content_input",
+    )
+
+    if st.button("🔗 Generate Share Link", type="primary"):
+        if share_text.strip():
+            assigned_id = None
+            if share_student != "All Students" and all_students:
+                # Parse student ID from label
+                try:
+                    assigned_id = int(share_student.split("ID: ")[1].rstrip(")"))
+                except (IndexError, ValueError):
+                    pass
+
+            share_id = create_share_link(
+                content_type=share_type,
+                content_data={"content": share_text.strip()},
+                assigned_to=assigned_id,
+            )
+
+            # Assign to student if specified
+            if assigned_id:
+                assign_content_to_student(share_id, assigned_id)
+
+            share_url = f"http://localhost:8501/shared_content?share={share_id}"
+            st.success("✅ Share link generated!")
+            st.code(share_url, language=None)
+            st.caption("Share this link with your students.")
+        else:
+            st.warning("Please enter content to share.")
+
+with share_col2:
+    st.markdown("#### 📋 Recent Shared Links")
+    all_links = get_all_share_links()
+
+    if all_links:
+        for link in all_links[:8]:
+            type_emoji = {"quiz": "📝", "learning_path": "🎯", "doubt_sheet": "📋"}.get(
+                link["content_type"], "📄"
+            )
+            assigned = link.get("assigned_name") or "All"
+
+            st.markdown(
+                f"""
+                <div style='background: #1a1d29; padding: 0.5rem 0.8rem; border-radius: 8px;
+                            margin-bottom: 0.4rem; border-left: 3px solid #6C63FF;
+                            font-size: 0.85rem;'>
+                    {type_emoji} <strong>{link['content_type'].replace('_', ' ').title()}</strong>
+                    — Assigned to: {assigned}
+                    <span style='color: #666;'>({link['created_at'][:10]})</span><br>
+                    <code style='font-size: 0.75rem;'>{link['share_id']}</code>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+    else:
+        st.info("No content shared yet.")
+
+# =================================================================
+# HOLIDAY AWARENESS PANEL
+# =================================================================
+upcoming_holidays = get_upcoming_holidays(days_ahead=14)
+today_holiday = is_holiday_today()
+
+if upcoming_holidays or today_holiday["is_holiday"]:
+    st.markdown("---")
+    st.markdown("### 📅 Holiday Awareness")
+
+    if today_holiday["is_holiday"]:
+        st.markdown(
+            f"""
+            <div style='background: linear-gradient(135deg, #b71c1c, #880e4f);
+                        border-radius: 10px; padding: 0.8rem 1.2rem;
+                        margin-bottom: 0.8rem; border: 1px solid #f44336;'>
+                <span style='color: #ffcdd2;'>
+                    🎉 <strong>Today is {today_holiday['name']}!</strong>
+                    Consider lighter activities or revision-focused sessions.
+                </span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    if upcoming_holidays:
+        for h in upcoming_holidays:
+            if h["days_until"] == 0:
+                continue  # Already shown above
+            badge_color = "#FF9800" if h["days_until"] <= 3 else "#6C63FF"
+            st.markdown(
+                f"""
+                <div style='background: #1a1d29; padding: 0.5rem 0.8rem; border-radius: 8px;
+                            margin-bottom: 0.3rem; border-left: 3px solid {badge_color};
+                            display: flex; justify-content: space-between; font-size: 0.85rem;'>
+                    <span>🗓️ {h['name']} — {h['day_of_week']}</span>
+                    <span style='color: {badge_color};'>In {h['days_until']} day(s)</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )

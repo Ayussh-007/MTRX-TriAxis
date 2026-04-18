@@ -8,11 +8,14 @@ import os
 
 from backend.pdf_processor import save_pdf, process_pdf
 from backend.rag_pipeline import create_vectorstore, add_to_vectorstore, vectorstore_exists
+from backend.ui_components import page_header, section_header, info_card
 
 
-st.markdown("# 📄 Upload Curriculum PDF")
-st.markdown("Upload a textbook or curriculum PDF to process it through the AI pipeline.")
-st.markdown("---")
+page_header(
+    "📄", "Upload Curriculum",
+    "Upload a textbook or curriculum PDF — AI will extract, clean, chunk and index it.",
+    accent="#A78BFA",
+)
 
 # ----- File Upload -----
 uploaded_file = st.file_uploader(
@@ -22,35 +25,56 @@ uploaded_file = st.file_uploader(
 )
 
 # ----- Processing Options -----
-col1, col2 = st.columns(2)
-with col1:
+opt_col1, opt_col2 = st.columns(2)
+with opt_col1:
     use_llm_chunker = st.toggle(
-        "Smart Chunking (LLM)",
+        "🧠 Smart Chunking (LLM)",
         value=True,
         help="Use LLM to create intelligent chunks. Disable for faster basic splitting.",
     )
-with col2:
+with opt_col2:
     append_mode = st.toggle(
-        "Append to existing curriculum",
+        "➕ Append to Existing Curriculum",
         value=True if vectorstore_exists() else False,
         help="If ON, adds to existing content. If OFF, replaces everything.",
     )
 
 # ----- Process Button -----
 if uploaded_file is not None:
-    st.markdown("---")
-    st.markdown(f"**File:** `{uploaded_file.name}` ({uploaded_file.size / 1024:.1f} KB)")
+    st.markdown("<hr>", unsafe_allow_html=True)
+
+    # File info card
+    st.markdown(
+        f"""
+        <div style='
+            background: #12151F;
+            border: 1px solid #252840;
+            border-radius: 10px;
+            padding: 0.9rem 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            margin-bottom: 1rem;
+        '>
+            <span style='font-size:1.6rem;'>📄</span>
+            <div>
+                <div style='font-weight:600; color:#E8EAF0; font-size:0.9rem;'>{uploaded_file.name}</div>
+                <div style='color:#6B7280; font-size:0.78rem; margin-top:2px;'>
+                    {uploaded_file.size / 1024:.1f} KB · PDF Document
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     if st.button("🚀 Process PDF", type="primary", use_container_width=True):
-        # Save the uploaded file
         with st.spinner("Saving file..."):
             file_path = save_pdf(uploaded_file)
             st.success(f"✅ File saved to `{file_path}`")
 
-        # Processing pipeline with progress
         progress_bar = st.progress(0, text="Starting pipeline...")
 
-        # Step 1: Extract & Clean & Chunk
         try:
             progress_bar.progress(10, text="📄 Extracting text from PDF...")
 
@@ -67,7 +91,6 @@ if uploaded_file is not None:
 
                 st.write(f"✅ Created **{len(chunks)} chunks** from the PDF")
 
-                # Step 2: Create/Update vector store
                 st.write("📊 Creating embeddings and storing in vector database...")
                 progress_bar.progress(70, text="📊 Building vector store...")
 
@@ -81,7 +104,6 @@ if uploaded_file is not None:
                 progress_bar.progress(100, text="✅ Pipeline complete!")
                 status.update(label="✅ Processing Complete!", state="complete")
 
-            # Store chunks in session state for preview
             st.session_state["last_chunks"] = chunks
 
         except Exception as e:
@@ -90,11 +112,11 @@ if uploaded_file is not None:
 
 # ----- Chunk Preview -----
 if "last_chunks" in st.session_state and st.session_state["last_chunks"]:
-    st.markdown("---")
-    st.markdown("### 📋 Processed Chunks Preview")
+    st.markdown("<hr>", unsafe_allow_html=True)
+    section_header("📋 Processed Chunks Preview", accent="#A78BFA")
 
     chunks = st.session_state["last_chunks"]
-    st.info(f"Showing {min(10, len(chunks))} of {len(chunks)} total chunks")
+    st.caption(f"Showing {min(10, len(chunks))} of {len(chunks)} total chunks")
 
     for i, chunk in enumerate(chunks[:10]):
         with st.expander(f"📌 {chunk.get('title', f'Chunk {i+1}')}", expanded=(i == 0)):
@@ -102,8 +124,8 @@ if "last_chunks" in st.session_state and st.session_state["last_chunks"]:
             st.caption(f"Length: {len(chunk.get('content', ''))} characters")
 
 # ----- Existing Files -----
-st.markdown("---")
-st.markdown("### 📁 Uploaded Files")
+st.markdown("<hr>", unsafe_allow_html=True)
+section_header("📁 Uploaded Files", accent="#A78BFA")
 
 upload_dir = "data/uploads"
 if os.path.exists(upload_dir):
@@ -111,8 +133,19 @@ if os.path.exists(upload_dir):
     if files:
         for f in files:
             file_size = os.path.getsize(os.path.join(upload_dir, f)) / 1024
-            st.markdown(f"- 📄 `{f}` ({file_size:.1f} KB)")
+            st.markdown(
+                f"""
+                <div style='background:#12151F; border:1px solid #252840; border-radius:8px;
+                            padding:0.6rem 0.9rem; margin-bottom:0.4rem;
+                            display:flex; align-items:center; gap:0.6rem;'>
+                    <span>📄</span>
+                    <span style='color:#E8EAF0; font-size:0.85rem; font-weight:500;'>{f}</span>
+                    <span style='color:#6B7280; font-size:0.78rem; margin-left:auto;'>{file_size:.1f} KB</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
     else:
-        st.caption("No files uploaded yet.")
+        info_card("No PDF files uploaded yet.", "📂", "#6B7280")
 else:
-    st.caption("No files uploaded yet.")
+    info_card("No PDF files uploaded yet.", "📂", "#6B7280")

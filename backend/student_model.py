@@ -37,9 +37,16 @@ def init_database():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             email TEXT UNIQUE,
+            login_id TEXT UNIQUE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    # Add login_id column if upgrading from older schema
+    try:
+        cursor.execute("ALTER TABLE students ADD COLUMN login_id TEXT")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
 
     # Attendance table
     cursor.execute("""
@@ -86,6 +93,31 @@ def init_database():
         )
     """)
 
+    # Shared content table (for shareable links)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS shared_content (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            share_id TEXT UNIQUE NOT NULL,
+            content_type TEXT NOT NULL,
+            content_data TEXT NOT NULL,
+            assigned_to INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (assigned_to) REFERENCES students(id)
+        )
+    """)
+
+    # Student assignments table (links students to shared content)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS student_assignments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id INTEGER NOT NULL,
+            share_id TEXT NOT NULL,
+            accessed BOOLEAN DEFAULT 0,
+            accessed_at TIMESTAMP,
+            FOREIGN KEY (student_id) REFERENCES students(id)
+        )
+    """)
+
     conn.commit()
     conn.close()
     print("✅ Database initialized")
@@ -93,13 +125,14 @@ def init_database():
 
 # ----- Student CRUD -----
 
-def add_student(name: str, email: str = None) -> int:
+def add_student(name: str, email: str = None, login_id: str = None) -> int:
     """
     Add a new student to the database.
 
     Args:
         name: Student's full name.
         email: Optional email address.
+        login_id: Unique login ID for student authentication (e.g., 'STU001').
 
     Returns:
         The new student's ID.
@@ -108,14 +141,42 @@ def add_student(name: str, email: str = None) -> int:
     cursor = conn.cursor()
 
     cursor.execute(
-        "INSERT INTO students (name, email) VALUES (?, ?)",
-        (name, email)
+        "INSERT INTO students (name, email, login_id) VALUES (?, ?, ?)",
+        (name, email, login_id)
     )
 
     student_id = cursor.lastrowid
     conn.commit()
     conn.close()
     return student_id
+
+
+def get_student_by_login_id(login_id: str) -> dict:
+    """Get a student by their unique login ID."""
+    conn = _get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM students WHERE login_id = ?", (login_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        return dict(row)
+    return None
+
+
+def update_student_login_id(student_id: int, login_id: str):
+    """Set or update a student's login ID."""
+    conn = _get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "UPDATE students SET login_id = ? WHERE id = ?",
+        (login_id, student_id)
+    )
+
+    conn.commit()
+    conn.close()
 
 
 def get_student(student_id: int) -> dict:

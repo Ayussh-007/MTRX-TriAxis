@@ -15,9 +15,13 @@ PyMuPDF>=1.24.0
 # --- Frontend ---
 streamlit>=1.39.0
 
+# --- Text Processing ---
+langchain-text-splitters>=0.3.0
+
 # --- Data & Utilities ---
 python-dotenv>=1.0.0
 requests>=2.31.0
+pandas>=2.2.0
 
 # --- Charts (for teacher dashboard) ---
 plotly>=5.22.0
